@@ -1,0 +1,56 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: latest
+
+    - name: Install MySQL
+      apt:
+        name: mysql-server
+        state: latest
+
+    - name: Install PHP and necessary extensions
+      apt:
+        name:
+          - php-fpm
+          - php-mysql
+        state: latest
+
+    - name: Configure Nginx to serve PHP application
+      blockinfile:
+        path: /etc/nginx/sites-available/default
+        block: |
+          server {
+            listen 80;
+            server_name _;
+            root /var/www/html;
+            index index.php index.html index.htm;
+            location / {
+              try_files $uri $uri/ =404;
+            }
+            location ~ \.php$ {
+              include snippets/fastcgi-php.conf;
+              fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+              fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+              include fastcgi_params;
+            }
+          }
+
+    - name: Create index.php to display phpinfo()
+      copy:
+        dest: "/var/www/html/index.php"
+        content: |
+          <?php
+          phpinfo();
+          ?>
+
+    - name: Restart Nginx and PHP-FPM services
+      service:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - nginx
+        - php7.4-fpm
